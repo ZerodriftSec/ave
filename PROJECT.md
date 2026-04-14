@@ -1,432 +1,481 @@
-# PermissionGuard - AVE API Integration
+# PermissionGuard
 
-## 项目概述
+## Reading a token contract should not require reading Solidity
 
-PermissionGuard 是一个基于 AVE API 构建的链上合约管理员权限风险监控产品。我们通过 AVE API 获取代币数据、风险评分和安全分析，结合 AI 源码分析，为用户提供可读性强的合约权限审计报告。
+Crypto users are being asked to make high-stakes trust decisions in seconds.
 
----
+A token launches, liquidity appears, social momentum builds, and people are expected to answer difficult questions almost instantly:
+- Who can still control this contract?
+- Can an admin freeze transfers, mint supply, or upgrade logic later?
+- Is the risk static, or can it change after users have already entered?
+- If something looks unusual, how should a non-auditor understand it?
 
-## 为什么选择 AVE API
+That gap is where PermissionGuard lives.
 
-AVE API 为我们提供了三个核心能力，这些是构建 PermissionGuard 的基础：
+PermissionGuard is a dynamic permission risk analysis and explanation tool for tokens and smart contracts. It helps users move beyond vague labels like “safe” or “risky” and understand the real operational question behind onchain trust:
 
-1. **实时风险数据** - AVE 提供的合约风险评分和安全指标
-2. **多链支持** - 统一接口访问 7+ 条主流 EVM 链
-3. **丰富的安全指标** - 20+ 项具体的安全检测指标
+> Who still has power over this contract, what can they do with that power, and what does that mean for users right now?
 
----
+Instead of forcing people to inspect raw source code or manually interpret scattered security signals, PermissionGuard combines AVE’s structured contract risk telemetry with source-based AI explanation to produce a fast, readable, outward-facing risk review.
 
-## 我们如何使用 AVE API
+## Why now
 
-### 1. 代币搜索与发现 (Token Search)
+The next generation of contract risk is not only about classic code exploits. Increasingly, the real danger comes from dynamic control.
 
-**使用场景：** 用户输入关键词查找代币
+In many tokens and protocols, the most important risk is not whether there is a textbook bug. It is whether a privileged actor can still:
+- mint new supply
+- blacklist users
+- pause transfers
+- modify balances
+- change trading conditions
+- upgrade the implementation behind a proxy
+- transfer or hide ownership in ways ordinary users cannot easily track
 
-**AVE 端点：** `GET /tokens?keyword={keyword}`
+This matters because users rarely read source code before acting. They rely on interfaces, social proof, and rough heuristics. That is often not enough.
 
-**实际应用：**
-- 用户搜索 "PEPE" → AVE 返回所有链上的 PEPE 代币
-- 用户输入合约地址 → AVE 返回匹配的代币信息
-- 支持多链结果：Ethereum、BSC、Base、Arbitrum 等
+A strong example is Drift-style operational risk around key and permission management. Even when a protocol is sophisticated, users and integrators still need clarity on questions like:
+- Which wallet, multisig, or authority can execute sensitive actions?
+- Are those permissions narrowly scoped or broadly dangerous?
+- Could compromised keys, misconfigured permissions, or overpowered operators create downstream user risk?
+- Is the protocol architecture minimizing trust, or merely hiding complexity behind better branding?
 
----
+PermissionGuard is designed for exactly this reality: dynamic, permission-driven risk that sits between code, governance, admin operations, and user trust.
 
-### 2. 风险数据获取 (Risk Analysis)
+## What PermissionGuard is
 
-**使用场景：** 获取合约的详细风险指标
+PermissionGuard is a hackathon project focused on fast analysis and explanation of admin and permission risk in tokens and smart contracts.
 
-**AVE 端点：** `GET /contracts/{tokenId}`
+It is not just another token scanner.
 
-**Token ID 格式：** `{address}-{chain}`（例如：`0x...-eth`）
+Traditional scanners often stop at a score, a badge, or a short list of flags. PermissionGuard goes one step further by translating those technical signals into a human-readable explanation of control.
 
-**我们展示的 AVE 风险指标：**
+Our product goal is simple:
+- surface high-impact permission signals quickly
+- explain what those permissions imply in plain English
+- help users and judges understand whether a contract’s trust model is acceptable
 
-| AVE 指标 | 展示位置 | 说明 |
-|---------|---------|------|
-| `risk_score` | 顶部卡片 | 整体风险评分，颜色编码 |
-| `buy_tax` / `sell_tax` | 基础信息 | 买卖税费，颜色警示 |
-| `holders` | 基础信息 | 持有人总数 |
-| `is_honeypot` | AVE 风险分析 | 是否为蜜罐合约 |
-| `has_mint_method` | AVE 风险分析 | 铸币权限 |
-| `has_black_method` | AVE 风险分析 | 黑名单权限 |
-| `transfer_pausable` | AVE 风险分析 | 暂停权限 |
-| `is_proxy` | AVE 风险分析 | 是否为代理合约 |
-| `selfdestruct` | AVE 风险分析 | 自毁功能 |
-| `owner_change_balance` | AVE 风险分析 | 余额修改权限 |
-| `hidden_owner` | AVE 风险分析 | 隐藏所有者检测 |
-| `pair_lock_percent` | AVE 风险分析 | 流动性锁定百分比 |
-| `owner` | AVE 风险分析 | 合约所有者地址 |
-| `creator_address` | AVE 风险分析 | 合约创建者地址 |
+The result is a workflow that is useful before a token purchase, before a protocol integration, during due diligence, or while investigating a suspicious contract.
 
-**风险评分映射：**
-```
-AVE Score (0-100)  →  显示颜色
-─────────────────────────────
-0-10    →  绿色 (Safe)
-10-30   →  蓝色 (Low Risk)
-30-50   →  黄色 (Caution)
-50-80   →  橙色 (High Risk)
-80-100  →  红色 (Dangerous)
-```
+## Product overview
 
----
+PermissionGuard gives users two fast ways to investigate a token or contract:
 
-### 3. 代币元数据获取 (Token Metadata)
+1. Search by keyword, token name, symbol, or address
+2. Analyze a contract directly by address and chain
 
-**AVE 端点：** `GET /tokens/{tokenId}`
+From there, the product builds a combined risk view with two layers:
 
-**我们展示的 AVE 代币数据：**
+1. AVE-powered structured risk data
+2. AI-powered source-code interpretation
 
-| AVE 指标 | 展示位置 |
-|---------|---------|
-| `market_cap` | 基础信息卡片 |
-| `current_price_usd` | AVE 风险分析区域 |
-| `fdv` (完全稀释估值) | AVE 风险分析区域 |
+Together, those layers answer both of the questions that matter most:
+- What risk signals are already visible at the contract and token level?
+- What does the verified source code imply about real admin power and implementation behavior?
 
----
+## What the user sees
 
-### 4. 数据来源标识
+A PermissionGuard report is designed to feel readable, fast, and decision-oriented.
 
-为了区分 AVE API 提供的数据和 AI 分析结果，我们在界面中明确标注：
+For a given token or contract, the user can quickly understand:
+- AVE risk score
+- token metadata and market context
+- whether the contract appears to be a honeypot
+- whether mint, blacklist, pause, proxy, self-destruct, or balance-modification powers exist
+- who the owner or creator appears to be
+- whether verified source code is available
+- what the source code suggests about controllers, vulnerabilities, and permission design
 
-**AVE 数据区域：**
-- 标题： "AVE Risk Analysis"
-- 展示：20+ 项 AVE API 的原始检测指标
-- 说明： "Data source: AVE API - Real-time contract risk analysis"
+The product does not only say “this is dangerous.” It explains why.
 
-**AI 分析区域：**
-- 标题： "Admin Permission Analysis"
-- 展示：基于源码的深度分析
-- 说明：AI 分析的权限类型和漏洞
+## Why AVE is central to the product
 
----
+AVE is the core machine-readable security layer inside PermissionGuard.
 
-### 5. 链配置获取
+It gives us three capabilities that are critical for a hackathon product built for real-world speed:
 
-**AVE 端点：** `GET /supported_chains`
+1. Real-time risk telemetry
+AVE provides contract-level risk signals quickly enough to support live investigation rather than offline research.
 
-**实现方式：**
-```typescript
-// src/app/api/chains/route.ts
-export async function GET() {
-  const res = await fetch(`${AVE_API_BASE}/supported_chains`, {
-    headers: { "X-API-KEY": apiKey },
-    next: { revalidate: 3600 },  // 缓存 1 小时
-  });
-  return NextResponse.json(data);
-}
-```
+2. Multi-chain consistency
+AVE lets us work across major EVM ecosystems through a unified API rather than bespoke chain-by-chain logic.
 
-**支持的链：**
-- Ethereum (eth)
-- BSC (bsc)
-- Base (base)
-- Arbitrum (arbitrum)
-- Polygon (polygon)
-- Optimism (optimism)
-- Avalanche (avalanche)
+3. Rich security indicators
+AVE exposes detailed fields that are especially relevant for permission-driven risk analysis, including owner information, honeypot status, mint-related capabilities, blacklist-related capabilities, pause controls, proxy detection, hidden owner signals, and more.
 
----
+That is why AVE is not just a background dependency in PermissionGuard. It is the foundation of our first-pass risk judgment.
 
-## 技术架构图
+## How PermissionGuard uses the AVE API
 
-```
-用户界面 (Next.js)
+PermissionGuard uses AVE as the product’s live data engine.
+
+### 1. Token search and discovery
+Endpoint:
+`GET /tokens?keyword={keyword}`
+
+This powers the search experience when a user types a token symbol, name, or address. It lets PermissionGuard quickly surface possible matches across chains and move users into analysis with minimal friction.
+
+### 2. Contract risk lookup
+Endpoint:
+`GET /contracts/{address}-{chain}`
+
+This is the most important AVE endpoint for our core narrative. It provides the structured contract risk signals that help us identify potentially dangerous admin authority.
+
+Examples of AVE fields used by the product include:
+- `risk_score`
+- `is_honeypot`
+- `buy_tax`
+- `sell_tax`
+- `owner`
+- `creator_address`
+- `has_mint_method`
+- `has_black_method`
+- `has_white_method`
+- `transfer_pausable`
+- `is_proxy`
+- `selfdestruct`
+- `owner_change_balance`
+- `can_take_back_ownership`
+- `hidden_owner`
+- `has_owner_removed_risk`
+- `holders`
+- `pair_lock_percent`
+- `external_call`
+- `trading_cooldown`
+- `slippage_modifiable`
+- `anti_whale_modifiable`
+
+These are exactly the kinds of machine-readable signals that map well to PermissionGuard’s mission: understanding control.
+
+### 3. Token metadata lookup
+Endpoint:
+`GET /tokens/{address}-{chain}`
+
+This enriches the report with user-facing token and market context such as:
+- name
+- symbol
+- decimals
+- current price
+- market cap
+- FDV
+- logo
+- AVE-linked token risk context
+
+This matters because users do not evaluate permission risk in isolation. They evaluate it relative to what they are buying, integrating, or researching.
+
+### 4. Holder data lookup
+Endpoint:
+`GET /tokens/top100/{address}-{chain}`
+
+This endpoint is included in our backend risk fetch bundle to support holder-related context. Even when the UI emphasizes permissions first, concentration and holder structure remain relevant to trust assessment.
+
+### 5. Supported chain discovery
+Endpoint:
+`GET /supported_chains`
+
+This gives PermissionGuard a clean path toward broader multi-chain support while preserving a unified product experience.
+
+## What PermissionGuard adds on top of AVE
+
+AVE gives us fast, structured, cross-chain risk signals.
+
+PermissionGuard adds a second layer: explanation.
+
+When verified source code is available, PermissionGuard:
+- retrieves the source from Etherscan-compatible APIs
+- analyzes the source with an LLM pipeline
+- converts implementation details into a readable permission narrative
+- identifies likely controllers and admin pathways
+- summarizes vulnerabilities and operational concerns
+- produces a recommendation that non-specialist users can understand
+
+This is the heart of the product.
+
+AVE tells us what risk indicators exist.
+PermissionGuard explains what they mean.
+
+## System architecture
+
+PermissionGuard is built as a Next.js application with a simple, practical architecture suited for a fast-moving hackathon build.
+
+### Architecture diagram
+
+```text
+User Interface (Next.js)
     ↓
-┌───────────────────────────────────────┐
-│         PermissionGuard              │
-│                                      │
-│  ┌──────────┐    ┌─────────────────┐ │
-│  │关键词搜索│    │ 直接地址查询     │ │
-│  └────┬─────┘    └────────┬────────┘ │
-│       │                   │          │
-│       └───────────┬───────┘          │
-│                   ↓                  │
-└───────────────────┼──────────────────┘
-                    ↓
-        ┌───────────────────────┐
-        │   并行数据获取         │
-        └───┬───────────────┬───┘
-            │               │
-    ┌───────▼──────┐  ┌────▼─────┐
-    │  AVE API     │  │Etherscan │
-    │              │  │   API    │
-    │/tokens       │  │          │
-    │/contracts    │  │ 源码获取 │
-    │/tokens/meta  │  └────┬─────┘
-    └──────┬───────┘       │
-           │               │
-           └───────┬───────┘
-                   ↓
-        ┌──────────────────────┐
-        │   数据处理与展示      │
-        └──────────────────────┘
-                   │
-    ┌──────────────┼──────────────┐
-    │              │              │
-┌───▼────┐    ┌───▼─────────┐  ┌─▼──────────┐
-│AVE 原始│    │AI 源码分析    │  │综合展示    │
-│数据展示 │    │(Claude)      │  │          │
-│        │    │              │  │• 风险卡片 │
-│• 20+   │    │• 权限检测    │  │• 统一视图 │
-│  指标  │    │• 漏洞分析    │  │• 颜色编码 │
-│• 实时  │    │• 建议生成    │  │          │
-│  数据  │    │              │  │          │
-└────────┘    └──────────────┘  └────────────┘
+┌──────────────────────────────────────────────┐
+│               PermissionGuard               │
+│                                              │
+│  ┌──────────────┐     ┌──────────────────┐   │
+│  │ Keyword      │     │ Direct Contract  │   │
+│  │ Search       │     │ Lookup           │   │
+│  └──────┬───────┘     └────────┬─────────┘   │
+│         │                      │             │
+│         └──────────────┬───────┘             │
+│                        ↓                     │
+└────────────────────────┼─────────────────────┘
+                         ↓
+             ┌─────────────────────────┐
+             │ Parallel Data Retrieval │
+             └───────┬─────────┬───────┘
+                     │         │
+          ┌──────────▼───┐   ┌─▼──────────────┐
+          │   AVE API    │   │ Etherscan API  │
+          │              │   │                │
+          │ /tokens      │   │ verified       │
+          │ /contracts   │   │ source fetch   │
+          │ /tokens/meta │   └──────┬─────────┘
+          └──────┬───────┘          │
+                 │                  │
+                 └────────┬─────────┘
+                          ↓
+             ┌─────────────────────────┐
+             │ Processing & Rendering  │
+             └──────────┬──────────────┘
+                        │
+      ┌─────────────────┼────────────────────┐
+      │                 │                    │
+┌─────▼─────┐   ┌───────▼────────┐   ┌───────▼──────────┐
+│ AVE Risk  │   │ AI Source      │   │ Unified Report   │
+│ Signals   │   │ Analysis       │   │ View             │
+│           │   │                │   │                  │
+│ • score   │   │ • permissions  │   │ • summary cards  │
+│ • taxes   │   │ • controllers  │   │ • risk framing   │
+│ • flags   │   │ • vulnerabilities │ │ • readable takeaways │
+│ • holders │   │ • recommendations │ │                  │
+└───────────┘   └────────────────┘   └──────────────────┘
 ```
 
-**数据流说明：**
+### Frontend
+The main interface lets a user:
+- search for a token
+- choose a contract directly by address and chain
+- review summary risk information
+- inspect deeper permission analysis when source code is available
 
-1. **AVE API 提供的数据**（直接展示）
-   - 风险评分（0-100）
-   - 税费数据
-   - 20+ 项安全检测指标
-   - 市场数据（市值、价格等）
+### Backend integration layer
+Internal API routes act as the orchestration layer between the frontend and external services.
 
-2. **Etherscan + Claude 分析**（补充展示）
-   - 源码深度分析
-   - 管理员权限解读
-   - 漏洞检测
-   - 风险建议
+Core routes include:
+- `/api/scan` for token discovery through AVE
+- `/api/security` for AVE risk, token, and holder data
+- `/api/fetch-source` for verified source retrieval
+- `/api/analyze-source` for AI-based source interpretation
+- `/api/chains` for supported chain metadata
 
-3. **两者结合**
-   - AVE 提供快速、准确的实时数据
-   - AI 提供深度的源码级分析
-   - 两者互补，提供全面的风险评估
+### External services
+PermissionGuard currently combines:
+- AVE for contract and token risk telemetry
+- Etherscan-compatible APIs for verified source retrieval
+- an Anthropic-compatible model pipeline for structured source analysis
+- Vercel Blob for caching fetched source and AI analysis results
 
----
+## User workflow
 
-## 实际应用案例
+### Workflow 1: Search-first discovery
+1. The user enters a keyword such as a token symbol or project name.
+2. PermissionGuard queries AVE token search and returns matching contracts.
+3. The user selects the relevant token and chain.
+4. The app fetches AVE contract risk and token metadata.
+5. In parallel, it attempts to retrieve verified source code.
+6. If source is available, PermissionGuard runs AI analysis.
+7. The user receives a combined permission-focused report.
 
-### 案例 1：关键词搜索流程
+### Workflow 2: Direct contract investigation
+1. The user enters a contract address and chooses a chain.
+2. PermissionGuard skips discovery and immediately analyzes that contract.
+3. AVE risk signals and token metadata are fetched.
+4. Verified source is retrieved when available.
+5. AI turns the source into a readable explanation of control, risk, and likely vulnerabilities.
 
+This workflow is especially useful for traders, researchers, and judges who want fast answers on a specific contract.
+
+## Representative output
+
+A strong hackathon project should not only describe what it does — it should make the output legible. A typical PermissionGuard result is meant to look like this:
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ PEPE (PEPE)                                               │
+│ 0x6982...1193                                             │
+│ Ethereum                                                  │
+│                                                            │
+│ AI Risk Score: 25  |  CAUTION  |  AVE Score: 15           │
+│                                                            │
+│ Market Cap: $3.5B         Holders: 285,431                │
+│ Buy Tax: 0%               Sell Tax: 0%                    │
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│ AVE RISK ANALYSIS                                         │
+│ Real-time structured risk telemetry                       │
+│                                                            │
+│ Owner Address:        0x8a35...                           │
+│ Creator Address:      0x96c5...                           │
+│ Honeypot:             No                                  │
+│ Mint Capability:      No                                  │
+│ Blacklist Capability: Yes                                 │
+│ Pause Capability:     Yes                                 │
+│ Proxy Contract:       Yes                                 │
+│ Hidden Owner Signal:  No                                  │
+└────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────┐
+│ ADMIN PERMISSION ANALYSIS                                 │
+│ Source-based explanation                                  │
+│                                                            │
+│ Controller Type: Upgradeable Proxy + Admin Owner          │
+│                                                            │
+│ HIGH-RISK PERMISSIONS                                     │
+│ • Transfer pause authority exists                         │
+│ • Blacklist logic can restrict specific addresses         │
+│ • Upgrade authority can modify implementation logic       │
+│                                                            │
+│ VULNERABILITIES / CONCERNS                                │
+│ • Users depend on privileged operator behavior            │
+│ • Governance and ownership changes can alter trust model  │
+│                                                            │
+│ RECOMMENDATION                                            │
+│ Suitable only if users accept centralized admin control   │
+└────────────────────────────────────────────────────────────┘
 ```
-1. 用户输入 "PEPE"
+
+This kind of output is the point of the product: not just more data, but a fast trust decision interface.
+
+## Example user workflows
+
+### Example 1: Search-first token review
+
+```text
+1. User enters “PEPE”
    ↓
-2. 调用 AVE /tokens?keyword=PEPE
+2. PermissionGuard calls AVE token search
    ↓
-3. 返回多个链上的 PEPE 代币
+3. AVE returns PEPE contracts across multiple chains
    ↓
-4. 用户选择 Ethereum 上的 PEPE
+4. User selects Ethereum PEPE
    ↓
-5. 并行调用：
-   - AVE /contracts/{address}-eth → 风险数据
-   - AVE /tokens/{address}-eth → 元数据
-   - Etherscan API → 源码
+5. PermissionGuard fetches in parallel:
+   - AVE contract risk data
+   - AVE token metadata
+   - holder-related data
+   - verified source from Etherscan
    ↓
-6. 展示完整的风险报告
+6. If source is available, AI analyzes admin permissions
+   ↓
+7. User receives a readable permission-focused report
 ```
 
-### 案例 2：直接地址查询流程
+### Example 2: Direct contract investigation
 
-```
-1. 用户输入合约地址: 0x6982508145454Ce325dDbE47a25d4ec3d2311933
+```text
+1. User pastes a contract address
    ↓
-2. 选择链: Ethereum
+2. User selects chain = Ethereum
    ↓
-3. 直接调用 AVE API 获取风险数据
+3. PermissionGuard directly fetches AVE risk data
    ↓
-4. 调用 Etherscan 获取源码
+4. Verified source is retrieved if available
    ↓
-5. AI 分析源码
+5. AI interprets admin powers, controllers, and vulnerabilities
    ↓
-6. 展示完整的权限审计报告
+6. User gets a fast decision-oriented report
 ```
 
----
+## Why this matters for judges and users
 
-## AVE API 在我们的核心价值主张中的作用
+PermissionGuard is not trying to replace a full audit.
 
-### 1. **实时风险评分**
-AVE 的 `risk_score` 为我们提供了即时的合约安全评估，这是用户最关心的第一指标。
+It is trying to solve a more immediate and widespread problem: most users interact with contracts long before a formal audit report is found, read, or understood.
 
-### 2. **细粒度的安全检测**
-AVE 提供的 20+ 项具体指标让我们能够：
-- 精确识别风险来源
-- 提供详细的风险解释
-- 帮助用户理解具体威胁
+That creates a major product gap in Web3 security:
+- scanners often surface labels without enough explanation
+- audit reports are too heavy for fast decision-making
+- source code is inaccessible to most users
+- operational permission risk is often under-explained
 
-### 3. **多链统一接口**
-AVE 的统一 API 让我们能够：
-- 一次集成，支持多链
-- 简化后端架构
-- 快速扩展到新链
+PermissionGuard turns that gap into a product experience.
 
-### 4. **可信的数据源**
-AVE 作为专业的链上数据分析平台，为我们提供了：
-- 准确的数据
-- 及时的更新
-- 可靠的服务
+For judges, the value is clear:
+- it tackles a real and growing category of onchain risk
+- it uses AVE in a concrete, technically meaningful way
+- it produces a user-facing output rather than an internal developer tool
+- it combines structured security data with explainable AI to improve decision quality
 
----
+For users, the value is even simpler:
+- fewer blind trust decisions
+- faster contract understanding
+- clearer visibility into admin power and dynamic permission risk
 
-## 性能优化
+## Design philosophy
 
-### 并行请求
-```typescript
-// 同时请求多个 AVE 端点以减少延迟
-const [riskRes, tokenRes, holdersRes] = await Promise.allSettled([
-  fetch(`${AVE_API_BASE}/contracts/${tokenId}`, { headers }),
-  fetch(`${AVE_API_BASE}/tokens/${tokenId}`, { headers }),
-  fetch(`${AVE_API_BASE}/tokens/top100/${tokenId}`, { headers }),
-]);
-```
+PermissionGuard was built around one belief:
 
-### 错误容错
-```typescript
-// 使用 Promise.allSettled 确保单个失败不影响整体
-async function unwrap(r: PromiseSettledResult<Response>) {
-  if (r.status !== "fulfilled") return null;  // 失败返回 null
-  return json?.status === 1 ? json.data : null;
-}
-```
+> The best security product for everyday onchain use is not the one with the most raw data. It is the one that makes hidden control understandable.
 
-### 缓存策略
-- 链列表：缓存 1 小时（很少变化）
-- 风险数据：按需获取（实时性要求高）
-- AI 分析：Vercel Blob 缓存（减少成本）
+That is why our focus is permission risk, not just generic safety labels.
 
----
+A contract can appear active, liquid, and popular while still preserving dangerous operator powers. If users cannot see those powers clearly, they are not really making informed decisions.
 
-## 未来计划：更深入的 AVE 集成
+PermissionGuard exists to make those hidden powers legible.
 
-### 1. 实时监控
-使用 AVE 的监控能力追踪合约权限变化：
-- 所有权转移
-- 角色授予/撤销
-- 实现升级
-- 参数修改
+## Performance and implementation choices
 
-### 2. 告警系统
-集成 AVE 的告警功能：
-- 权限变化通知
-- 风险评分突变
-- 可疑交易检测
+To keep the experience fast and resilient, PermissionGuard uses:
+- parallel fetching for AVE risk, token metadata, and holder-related data
+- graceful partial failure handling through `Promise.allSettled`
+- caching for source code and AI analysis where available
+- server-side integration boundaries so the browser does not need direct exposure to upstream APIs
 
-### 3. 协议聚合
-利用 AVE 的协议追踪能力：
-- 多合约统一视图
-- 协议级别风险评估
-- 关联合约分析
+These choices help the product stay responsive even when one part of the pipeline is incomplete.
 
----
+## Current scope and limitations
 
-## 环境配置
+PermissionGuard is already effective as a hackathon submission, but it is also intentionally pragmatic.
 
-```env
-# 必需的 AVE API 配置
-AVE_API_KEY=ave_prod_xxxxx
+Current constraints include:
+- AI source analysis depends on verified source code availability
+- source retrieval is currently tied to Etherscan-compatible EVM workflows
+- some AVE data returned by the backend is richer than what is currently surfaced in the UI
+- partial upstream failures may still lead to partially populated reports
 
-# 可选但推荐的配置
-ETHERSCAN_API_KEY=etherscan_xxxxx
-ANTHROPIC_API_KEY=sk-ant-xxxxx
-```
+These are acceptable tradeoffs for a product whose core insight is already strong: permission risk explanation is valuable even in an initial version.
 
----
+## Why PermissionGuard deserves to exist
 
-## 数据示例
+Web3 has no shortage of data.
+What it lacks is readable trust infrastructure.
 
-### 用户界面布局
+PermissionGuard turns fragmented contract telemetry and complex implementation details into something users can actually act on. It helps answer the most important question in token risk analysis:
 
-```
-┌────────────────────────────────────────────────────────┐
-│ PEPE (PEPE)                                            │
-│ 0x6982...1193                                          │
-│ Ethereum                                               │
-│                                                        │
-│ AI Risk Score: 25     CAUTION    │  AVE Score: 15     │
-│                                                        │
-│ Market Cap: $3,500,000,000    Holders: 285,431        │
-│ Buy Tax: 0% (绿色)            Sell Tax: 0% (绿色)      │
-└────────────────────────────────────────────────────────┘
+If this contract still has powerful admins, what can they do to me?
 
-┌────────────────────────────────────────────────────────┐
-│ AVE RISK ANALYSIS                                      │
-│ ←─ AVE API 原始数据                                    │
-│                                                        │
-│ Owner Address:      0x8a35...                         │
-│ Creator Address:    0x96c5...                         │
-│ Is Honeypot:        NO ✓                              │
-│ Mint Authority:     NO ✓                              │
-│ Blacklist Method:   NO ✓                              │
-│ Can Pause:          NO ✓                              │
-│ Is Proxy:           YES ⚠                             │
-│ Self-Destruct:      NO ✓                              │
-│ Owner Change Bal:   NO ✓                              │
-│ Hidden Owner:       NONE ✓                            │
-│ Liquidity Lock:     95%                               │
-│ Price (USD):        $0.00001234                       │
-│ FDV:                $3,200,000,000                    │
-│                                                        │
-│ Data source: AVE API - Real-time contract risk analysis│
-└────────────────────────────────────────────────────────┘
+By combining AVE’s structured security signals with source-aware AI explanation, PermissionGuard offers a practical new interface for understanding dynamic permission risk.
 
-┌────────────────────────────────────────────────────────┐
-│ ADMIN PERMISSION ANALYSIS                              │
-│ ←─ AI 源码分析 (Claude + Etherscan)                    │
-│                                                        │
-│ Overview: PEPE is an ERC20 token...                   │
-│                                                        │
-│ ✓ Mint Authority: SAFE                                │
-│ ✓ Freeze Authority: SAFE                              │
-│ ⚠ Upgrade Authority: YES - Proxy admin can upgrade   │
-│ ✓ Fund Sweep: SAFE                                    │
-│                                                        │
-│ Controller: Proxy Contract                            │
-│ Type: Ethereum Proxy                                  │
-│ Address: 0x8a35...                                    │
-└────────────────────────────────────────────────────────┘
-```
+That is why we believe it is a strong hackathon project:
+- it addresses a real user problem
+- it is technically grounded
+- it demonstrates clear AVE integration
+- it delivers a product, not just a backend capability
+- and it points toward a future where onchain trust becomes easier to verify before users are harmed
 
-### AVE API 返回的原始数据
-```json
-{
-  "status": 1,
-  "data": {
-    "risk_score": 15,
-    "buy_tax": 0,
-    "sell_tax": 0,
-    "has_mint_method": 0,
-    "has_black_method": 0,
-    "transfer_pausable": "0",
-    "is_proxy": "1",
-    "selfdestruct": "0",
-    "owner_change_balance": "0",
-    "hidden_owner": "0",
-    "holders": 285431,
-    "pair_lock_percent": 95,
-    "owner": "0x8a35...",
-    "creator_address": "0x96c5...",
-    "is_honeypot": 0
-  }
-}
-```
+## Environment and dependencies
 
----
+Key environment variables used by the project include:
+- `AVE_API_KEY`
+- `ETHERSCAN_API_KEY`
+- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_BASE_URL` optional
+- `ANTHROPIC_MODEL` optional
 
-## 总结
+## Final note
 
-AVE API 是 PermissionGuard 的核心数据源，与 AI 分析形成互补：
+PermissionGuard is built for the moment just before trust is extended.
 
-### AVE API 提供的能力
-1. ✅ **实时风险评分** - 即时的 0-100 风险评分
-2. ✅ **20+ 项安全指标** - 涵盖蜜罐、税费、权限等
-3. ✅ **市场数据** - 市值、价格、持有人数
-4. ✅ **多链支持** - 统一接口访问 7+ 条 EVM 链
-5. ✅ **快速响应** - 无需等待链上数据同步
+Before a user buys.
+Before a team integrates.
+Before an analyst recommends.
+Before a judge asks whether this project solves something real.
 
-### AI 分析提供的能力
-1. ✅ **源码深度分析** - 理解合约逻辑
-2. ✅ **权限语义解读** - 将技术代码转为可读说明
-3. ✅ **漏洞检测** - 发现潜在安全风险
-4. ✅ **风险建议** - 提供操作建议
+Our answer is yes.
 
-### 两者结合的价值
-- **AVE 提供快速准确的实时数据** - 用户第一时间看到风险概况
-- **AI 提供深度的源码级分析** - 帮助用户理解具体风险
-- **双重验证** - AVE 和 AI 结果互相印证
-- **全面覆盖** - 既有关键指标，又有深度分析
-
-通过 AVE API，我们能够在黑客松期间快速构建出一个功能完整、数据准确的合约权限审计产品。
-
----
+PermissionGuard makes dynamic permission risk visible, understandable, and actionable.
