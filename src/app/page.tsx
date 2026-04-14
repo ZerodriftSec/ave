@@ -1,376 +1,382 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import {
+  POPULAR_CHAINS,
+  riskLevel,
+  taxColor,
+  Spinner,
+} from "@/components/shared";
 
 /* ─── Types ─── */
-interface RiskData {
-  is_honeypot: number;
-  buy_tax: number;
-  sell_tax: number;
-  owner: string;
-  creator_address: string;
-  has_mint_method: number;
-  has_black_method: number;
-  has_white_method: number;
-  transfer_pausable: string;
-  is_proxy: string;
-  selfdestruct: string;
-  owner_change_balance: string;
-  can_take_back_ownership: string;
-  hidden_owner: string;
-  has_owner_removed_risk: number;
-  is_in_dex: string;
-  pair_lock_percent: number;
-  risk_score: number;
-  total: string;
-  holders: number;
-  token_holders_rank: { address: string; percent: number; is_contract: number; is_lp: number }[];
-  holder_analysis: {
-    average_tax: number;
-    sell_failure: number;
-    sell_successful: number;
-    simulate_holders: number;
-  };
-  external_call: string;
-  trading_cooldown: string;
-  slippage_modifiable: number;
-  anti_whale_modifiable: string;
-  creator_percent: string;
-  owner_percent: string;
-  approve_gas: string;
-  dex: { amm: string; liquidity: number; name: string; pair: string }[];
-  [key: string]: unknown;
-}
-
-interface TokenData {
-  token: string;
+interface SearchResult {
+  address: string;
   chain: string;
   name: string;
   symbol: string;
-  decimal: number;
-  current_price_usd: string;
-  market_cap: number;
-  fdv: number;
-  total: string;
   logo_url: string;
+}
+
+interface TokenData {
+  market_cap: number;
+  current_price_usd: string;
+  fdv: number;
   risk_score: string;
-  risk_level: number;
-  is_honeypot: boolean;
-  has_mint_method: boolean;
-  is_in_blacklist: boolean;
   [key: string]: unknown;
 }
 
-interface SecurityResponse {
-  risk: RiskData | null;
-  token: TokenData | null;
-  holders: unknown;
+interface RiskData {
+  risk_score: number;
+  holders: number;
+  buy_tax: number;
+  sell_tax: number;
+  [key: string]: unknown;
+}
+
+interface PermissionEntry {
+  present: boolean;
+  description: string;
+  severity: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
+}
+
+interface AiAnalysis {
+  overview: string;
+  risk_score: number;
+  risk_level: string;
+  permissions: Record<string, PermissionEntry>;
+  controller: {
+    type: string;
+    address: string | null;
+    description: string;
+  };
+  vulnerabilities: { name: string; description: string; severity: string }[];
+  recommendation: string;
+  rawText?: string;
 }
 
 /* ─── Helpers ─── */
-function riskLevel(score: number): { label: string; color: string; bg: string } {
-  if (score >= 80) return { label: "Dangerous", color: "text-red-600", bg: "bg-red-50 border-red-200" };
-  if (score >= 50) return { label: "High Risk", color: "text-orange-600", bg: "bg-orange-50 border-orange-200" };
-  if (score >= 30) return { label: "Caution", color: "text-amber-600", bg: "bg-amber-50 border-amber-200" };
-  if (score >= 10) return { label: "Low Risk", color: "text-blue-600", bg: "bg-blue-50 border-blue-200" };
-  return { label: "Safe", color: "text-green-600", bg: "bg-green-50 border-green-200" };
-}
+const SEVERITY_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  CRITICAL: { bg: "bg-red-100", text: "text-red-700", label: "CRITICAL" },
+  HIGH: { bg: "bg-orange-100", text: "text-orange-700", label: "HIGH" },
+  MEDIUM: { bg: "bg-yellow-100", text: "text-yellow-700", label: "MEDIUM" },
+  LOW: { bg: "bg-blue-100", text: "text-blue-700", label: "LOW" },
+  NONE: { bg: "bg-green-100", text: "text-green-700", label: "NONE" },
+};
 
-function boolTag(value: number | string | boolean | undefined) {
-  const v = String(value).toLowerCase();
-  const isTrue = v === "1" || v === "true" || v === "yes";
-  const isFalse = v === "0" || v === "false" || v === "no" || v === "" || value === undefined || value === null;
-  if (isTrue)
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
-        YES
-      </span>
-    );
-  if (isFalse)
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
-        NO
-      </span>
-    );
+function SeverityBadge({ severity }: { severity: string }) {
+  const s = SEVERITY_STYLES[severity] ?? SEVERITY_STYLES.NONE;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">
-      {String(value)}
+    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${s.bg} ${s.text}`}>
+      {s.label}
     </span>
   );
 }
 
-function taxColor(tax: number) {
-  if (tax >= 20) return "text-red-600";
-  if (tax >= 5) return "text-orange-600";
-  if (tax >= 1) return "text-amber-600";
-  return "text-green-600";
-}
-
-const POPULAR_CHAINS = [
-  { chain: "eth", name: "Ethereum" },
-  { chain: "bsc", name: "BSC" },
-  { chain: "solana", name: "Solana" },
-  { chain: "base", name: "Base" },
-  { chain: "arbitrum", name: "Arbitrum" },
-  { chain: "polygon", name: "Polygon" },
-  { chain: "optimism", name: "Optimism" },
-  { chain: "avalanche", name: "Avalanche" },
-];
+const PERMISSION_LABELS: Record<string, string> = {
+  mint_authority: "Mint Authority",
+  freeze_authority: "Freeze Authority",
+  blacklist_authority: "Blacklist Authority",
+  pause_authority: "Pause Authority",
+  upgrade_authority: "Upgrade Authority",
+  sweep_authority: "Fund Sweep / Withdraw",
+  owner_change_balance: "Owner Can Change Balance",
+  set_owner_authority: "Ownership Transfer",
+  hidden_owner: "Hidden Owner",
+  proxy_contract: "Proxy Contract",
+  selfdestruct: "Self-Destruct",
+  trading_cooldown: "Trading Cooldown",
+  slippage_modifiable: "Slippage Modifiable",
+  external_call: "External Call Risk",
+};
 
 /* ─── Component ─── */
-export default function Home() {
-  const [address, setAddress] = useState("");
-  const [chain, setChain] = useState("eth");
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<SecurityResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function ScannerPage() {
+  const [keyword, setKeyword] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Source code analysis state
-  const [sourceCode, setSourceCode] = useState("");
-  const [srcLoading, setSrcLoading] = useState(false);
-  const [srcAnalysis, setSrcAnalysis] = useState<string | null>(null);
-  const [srcCost, setSrcCost] = useState<number | null>(null);
-  const [srcError, setSrcError] = useState<string | null>(null);
+  // Selected token
+  const [selected, setSelected] = useState<SearchResult | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
+  // AVE data
+  const [risk, setRisk] = useState<RiskData | null>(null);
+  const [tokenData, setTokenData] = useState<TokenData | null>(null);
+
+  // AI analysis state
+  const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  // Step 1: Search tokens
   const search = useCallback(async () => {
-    const trimmed = address.trim();
-    if (!trimmed) return;
-    setLoading(true);
-    setError(null);
-    setData(null);
+    const query = keyword.trim();
+    if (!query) return;
+
+    setSearchLoading(true);
+    setSearchError(null);
+    setSearchResults(null);
+    setSelected(null);
+    setRisk(null);
+    setTokenData(null);
+    setDetailError(null);
+    setAiAnalysis(null);
+    setAiError(null);
 
     try {
       const res = await fetch(
-        `/api/security?address=${encodeURIComponent(trimmed)}&chain=${encodeURIComponent(chain)}`
+        `/api/scan?keyword=${encodeURIComponent(query)}`
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Request failed (${res.status})`);
       }
-      const json: SecurityResponse = await res.json();
-      if (!json.risk && !json.token) {
-        throw new Error("No data found for this address on the selected chain.");
-      }
-      setData(json);
+      const results: SearchResult[] = await res.json();
+      setSearchResults(results);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      setSearchError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setLoading(false);
+      setSearchLoading(false);
     }
-  }, [address, chain]);
+  }, [keyword]);
 
-  const analyzeSource = useCallback(async () => {
-    const trimmed = sourceCode.trim();
-    if (!trimmed) return;
-    setSrcLoading(true);
-    setSrcError(null);
-    setSrcAnalysis(null);
-    setSrcCost(null);
+  // Step 2: User selects a token → fetch AVE + source + AI analysis
+  const selectToken = useCallback(async (result: SearchResult) => {
+    setSelected(result);
+    setDetailLoading(true);
+    setDetailError(null);
+    setRisk(null);
+    setTokenData(null);
+    setAiAnalysis(null);
+    setAiError(null);
 
     try {
-      const res = await fetch("/api/analyze-source", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceCode: trimmed }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Request failed (${res.status})`);
-      }
-      const json: { analysis: string; costUsd: number } = await res.json();
-      setSrcAnalysis(json.analysis);
-      setSrcCost(json.costUsd);
-    } catch (err) {
-      setSrcError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setSrcLoading(false);
-    }
-  }, [sourceCode]);
+      // Fetch AVE risk data and Etherscan source code in parallel
+      const [aveRes, srcRes] = await Promise.all([
+        fetch(
+          `/api/security?address=${encodeURIComponent(result.address)}&chain=${encodeURIComponent(result.chain)}`
+        ),
+        fetch(
+          `/api/fetch-source?address=${encodeURIComponent(result.address)}&chain=${encodeURIComponent(result.chain)}`
+        ),
+      ]);
 
-  const risk = data?.risk;
-  const token = data?.token;
-  const score = risk?.risk_score ?? Number(token?.risk_score ?? 0);
-  const level = riskLevel(score);
+      // Process AVE data
+      if (aveRes.ok) {
+        const aveJson = await aveRes.json();
+        setRisk(aveJson.risk);
+        setTokenData(aveJson.token);
+      }
+
+      // Process source code
+      const srcJson = srcRes.ok ? await srcRes.json() : null;
+      const sourceCode = srcJson?.sourceCode ?? null;
+
+      // Run AI analysis if source code was fetched
+      if (sourceCode) {
+        const aiRes = await fetch("/api/analyze-source", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceCode, address: result.address, chain: result.chain }),
+        });
+        if (aiRes.ok) {
+          const aiJson: { analysis: AiAnalysis; costUsd: number } = await aiRes.json();
+          setAiAnalysis(aiJson.analysis);
+        } else {
+          const body = await aiRes.json().catch(() => ({}));
+          setAiError(body.error || "AI analysis failed");
+        }
+      } else {
+        setAiError(srcJson?.error || "No verified source code found on Etherscan for this contract.");
+      }
+    } catch (err) {
+      setDetailError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  const aveScore = risk?.risk_score ?? Number(tokenData?.risk_score ?? 0);
+  const aveLevel = riskLevel(aveScore);
+  const aiRiskLevel = aiAnalysis?.risk_level ?? "";
+  const aiRiskScore = aiAnalysis?.risk_score;
 
   return (
-    <div className="min-h-screen flex flex-col bg-[var(--background)]">
-      {/* Header */}
-      <header className="border-b border-gray-200 bg-white px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold text-sm">
-            PG
-          </div>
-          <h1 className="text-lg font-semibold tracking-tight text-gray-900">
-            PermissionGuard
-          </h1>
-          <span className="text-xs text-gray-400 ml-1 hidden sm:inline">
-            Onchain Admin Risk Monitor
-          </span>
-        </div>
-      </header>
+    <div className="flex flex-col min-h-full bg-[var(--background)]">
+      <div className="flex-1 px-6 sm:px-8 py-6 max-w-5xl mx-auto w-full">
+        {/* Page title */}
+        <h1 className="text-xl font-semibold text-gray-900 mb-1">PermissionGuard</h1>
+        <p className="text-sm text-gray-500 mb-6">
+          Search by token name, symbol, or contract address to check admin risk and security permissions.
+        </p>
 
-      <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-8">
         {/* Search Bar */}
         <div className="mb-8">
-          <p className="text-sm text-gray-500 mb-4">
-            Enter a token contract address to check its security and admin risk profile.
-          </p>
           <div className="flex flex-col sm:flex-row gap-3">
-            <select
-              value={chain}
-              onChange={(e) => setChain(e.target.value)}
-              className="h-12 rounded-xl border border-gray-300 bg-white px-4 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent min-w-[160px]"
-            >
-              {POPULAR_CHAINS.map((c) => (
-                <option key={c.chain} value={c.chain}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
             <input
               type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && search()}
-              placeholder="0x... or token contract address"
+              placeholder="Token name, symbol, or contract address (e.g. PEPE, 0x...)"
               className="flex-1 h-12 rounded-xl border border-gray-300 bg-white px-4 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono placeholder:text-gray-400"
             />
             <button
               onClick={search}
-              disabled={loading || !address.trim()}
+              disabled={searchLoading || !keyword.trim()}
               className="h-12 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
             >
-              {loading ? (
+              {searchLoading ? (
                 <span className="inline-flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Scanning
+                  <Spinner />
+                  Searching
                 </span>
               ) : (
-                "Scan"
+                "Search"
               )}
             </button>
           </div>
         </div>
 
-        {/* Source Code Analysis Section */}
-        <div className="mb-8">
-          <h2 className="text-base font-semibold text-gray-900 mb-2">
-            AI Source Code Analysis
-          </h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Paste Solidity (EVM) contract source code for AI-powered risk and vulnerability analysis.
-          </p>
-          <textarea
-            value={sourceCode}
-            onChange={(e) => setSourceCode(e.target.value)}
-            placeholder={`// Paste your Solidity contract here...\npragma solidity ^0.8.0;\n\ncontract MyToken {\n  // ...\n}`}
-            className="w-full h-64 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-gray-400 resize-y"
-          />
-          <div className="flex items-center gap-4 mt-3">
-            <button
-              onClick={analyzeSource}
-              disabled={srcLoading || !sourceCode.trim()}
-              className="h-10 px-5 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
-            >
-              {srcLoading ? (
-                <span className="inline-flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Analyzing
-                </span>
-              ) : (
-                "Analyze Source Code"
-              )}
-            </button>
-            {srcCost !== null && srcCost > 0 && (
-              <span className="text-xs text-gray-400">
-                Cost: ${srcCost.toFixed(4)}
-              </span>
-            )}
-          </div>
-
-          {/* Source Analysis Error */}
-          {srcError && (
-            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              {srcError}
-            </div>
-          )}
-
-          {/* Source Analysis Results */}
-          {srcAnalysis && (
-            <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                AI Risk Analysis
-              </h3>
-              <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap break-words">
-                {srcAnalysis}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Error */}
-        {error && (
+        {/* Search Error */}
+        {searchError && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
+            {searchError}
           </div>
         )}
 
-        {/* Results */}
-        {data && (
-          <div className="space-y-6">
-            {/* Summary Card */}
-            <div className={`rounded-2xl border p-6 ${level.bg}`}>
+        {/* Search Loading */}
+        {searchLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Spinner className="h-8 w-8 text-blue-500" />
+            <span className="ml-3 text-gray-500">Searching tokens...</span>
+          </div>
+        )}
+
+        {/* Search Results List */}
+        {searchResults && !searchLoading && (
+          <div className="mb-8">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+              Search Results ({searchResults.length})
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {searchResults.map((r) => (
+                <button
+                  key={`${r.address}-${r.chain}`}
+                  onClick={() => selectToken(r)}
+                  disabled={detailLoading}
+                  className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                    selected?.address === r.address && selected?.chain === r.chain
+                      ? "border-blue-400 bg-blue-50 ring-1 ring-blue-200"
+                      : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                  } disabled:opacity-60`}
+                >
+                  {r.logo_url ? (
+                    <img src={r.logo_url} alt="" className="w-8 h-8 rounded-full bg-gray-100 flex-shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex-shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {r.name} <span className="text-gray-400">{r.symbol}</span>
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {POPULAR_CHAINS.find((c) => c.chain === r.chain)?.name ?? r.chain}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Detail Loading */}
+        {detailLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Spinner className="h-8 w-8 text-blue-500" />
+            <span className="ml-3 text-gray-500">Analyzing token security...</span>
+          </div>
+        )}
+
+        {/* Detail Error */}
+        {detailError && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {detailError}
+          </div>
+        )}
+
+        {/* Token Detail */}
+        {selected && !detailLoading && (risk || tokenData || aiAnalysis) && (
+          <div className="space-y-6 pb-8">
+            {/* ── Summary Card ── */}
+            <div className={`rounded-2xl border p-6 ${aveLevel.bg}`}>
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                {/* Token info */}
                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                  {token?.logo_url && (
+                  {selected.logo_url && (
                     <img
-                      src={token.logo_url}
+                      src={selected.logo_url}
                       alt=""
                       className="w-12 h-12 rounded-full bg-gray-100 flex-shrink-0"
                     />
                   )}
                   <div className="min-w-0">
                     <h2 className="text-xl font-semibold truncate text-gray-900">
-                      {token?.name || "Unknown Token"}
-                      {token?.symbol && (
+                      {selected.name || "Unknown Token"}
+                      {selected.symbol && (
                         <span className="text-gray-400 font-normal ml-2">
-                          {token.symbol}
+                          {selected.symbol}
                         </span>
                       )}
                     </h2>
                     <p className="text-xs text-gray-400 font-mono truncate mt-1">
-                      {address.trim()}
+                      {selected.address}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {POPULAR_CHAINS.find((c) => c.chain === selected.chain)?.name ?? selected.chain}
                     </p>
                   </div>
                 </div>
 
-                {/* Risk Score */}
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <div className={`text-4xl font-bold ${level.color}`}>
-                      {score}
+                {/* AI Risk Score (if available) */}
+                {aiAnalysis && (
+                  <div className="flex items-center gap-4">
+                    <div className="text-center px-4">
+                      <div className="text-xs text-gray-400 mb-1">AI Risk Score</div>
+                      <div className={`text-4xl font-bold ${
+                        aiRiskLevel === "DANGEROUS" ? "text-red-600" :
+                        aiRiskLevel === "CAUTION" ? "text-yellow-600" :
+                        aiRiskLevel === "SAFE" ? "text-green-600" :
+                        "text-gray-500"
+                      }`}>
+                        {aiRiskScore ?? "—"}
+                      </div>
+                      <div className={`text-sm font-semibold mt-1 ${
+                        aiRiskLevel === "DANGEROUS" ? "text-red-600" :
+                        aiRiskLevel === "CAUTION" ? "text-yellow-600" :
+                        aiRiskLevel === "SAFE" ? "text-green-600" :
+                        "text-gray-500"
+                      }`}>
+                        {aiRiskLevel}
+                      </div>
                     </div>
-                    <div className={`text-sm font-medium mt-1 ${level.color}`}>
-                      {level.label}
-                    </div>
+                    {aveScore > 0 && (
+                      <div className="text-center px-4 border-l border-gray-200/60">
+                        <div className="text-xs text-gray-400 mb-1">AVE Score</div>
+                        <div className={`text-2xl font-bold ${aveLevel.color}`}>{aveScore}</div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Quick stats */}
+              {/* AVE numeric data */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-4 border-t border-gray-200/60">
                 <div>
                   <div className="text-xs text-gray-400">Market Cap</div>
                   <div className="text-sm font-medium mt-0.5 text-gray-800">
-                    {token?.market_cap
-                      ? `$${Number(token.market_cap).toLocaleString()}`
+                    {tokenData?.market_cap
+                      ? `$${Number(tokenData.market_cap).toLocaleString()}`
                       : "—"}
                   </div>
                 </div>
@@ -395,200 +401,124 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Detail Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Admin Powers */}
-              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                  Admin Powers
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <Row label="Can mint new tokens" value={boolTag(risk?.has_mint_method)} />
-                  <Row label="Can freeze / blacklist" value={boolTag(risk?.has_black_method)} />
-                  <Row label="Has whitelist control" value={boolTag(risk?.has_white_method)} />
-                  <Row label="Can pause transfers" value={boolTag(risk?.transfer_pausable)} />
-                  <Row label="Can upgrade contract" value={boolTag(risk?.is_proxy)} />
-                  <Row label="Can modify balances" value={boolTag(risk?.owner_change_balance)} />
-                  <Row label="Can self-destruct" value={boolTag(risk?.selfdestruct)} />
-                  <Row label="Can modify slippage" value={boolTag(risk?.slippage_modifiable)} />
-                  <Row label="Hidden owner exists" value={boolTag(risk?.hidden_owner)} />
-                  <Row label="Can reclaim ownership" value={boolTag(risk?.can_take_back_ownership)} />
-                  <Row label="External calls" value={boolTag(risk?.external_call)} />
-                  <Row label="Trading cooldown" value={boolTag(risk?.trading_cooldown)} />
-                </div>
-              </section>
+            {/* AI Analysis Error */}
+            {aiError && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                {aiError}
+              </div>
+            )}
 
-              {/* Ownership */}
-              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                  Ownership
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <Row
-                    label="Owner"
-                    value={
-                      <span className="font-mono text-xs text-gray-500 break-all">
-                        {risk?.owner || "—"}
-                      </span>
-                    }
-                  />
-                  <Row
-                    label="Creator"
-                    value={
-                      <span className="font-mono text-xs text-gray-500 break-all">
-                        {risk?.creator_address || "—"}
-                      </span>
-                    }
-                  />
-                  <Row
-                    label="Owner holdings"
-                    value={
-                      <span className="text-gray-700">
-                        {risk?.owner_percent ?? "—"}%
-                      </span>
-                    }
-                  />
-                  <Row
-                    label="Creator holdings"
-                    value={
-                      <span className="text-gray-700">
-                        {risk?.creator_percent ?? "—"}%
-                      </span>
-                    }
-                  />
-                  <Row
-                    label="Ownership renounced"
-                    value={boolTag(risk?.has_owner_removed_risk === 1)}
-                  />
-                  <Row
-                    label="Ownership renounced risk"
-                    value={boolTag(risk?.has_owner_removed_risk)}
-                  />
-                </div>
-
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 mt-8">
-                  Scam Detection
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <Row label="Honeypot" value={boolTag(risk?.is_honeypot)} />
-                  <Row
-                    label="Holder sell failure"
-                    value={
-                      <span className="text-gray-700">
-                        {risk?.holder_analysis
-                          ? `${risk.holder_analysis.sell_failure} / ${risk.holder_analysis.simulate_holders}`
-                          : "—"}
-                      </span>
-                    }
-                  />
-                  <Row
-                    label="Avg tax (simulated)"
-                    value={
-                      <span className={taxColor(risk?.holder_analysis?.average_tax ?? 0)}>
-                        {risk?.holder_analysis?.average_tax != null
-                          ? `${risk.holder_analysis.average_tax}%`
-                          : "—"}
-                      </span>
-                    }
-                  />
-                </div>
-              </section>
-
-              {/* Liquidity */}
-              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                  Liquidity
-                </h3>
-                <div className="space-y-3 text-sm">
-                  <Row label="Listed on DEX" value={boolTag(risk?.is_in_dex)} />
-                  <Row
-                    label="LP lock percent"
-                    value={
-                      <span className="text-gray-700">
-                        {risk?.pair_lock_percent != null
-                          ? `${risk.pair_lock_percent}%`
-                          : "—"}
-                      </span>
-                    }
-                  />
-                  {risk?.dex && risk.dex.length > 0 && (
-                    <div className="pt-3 border-t border-gray-100">
-                      <div className="text-xs text-gray-400 mb-2">DEX Pairs</div>
-                      {risk.dex.map((d, i) => (
-                        <div
-                          key={i}
-                          className="flex justify-between py-1.5 text-xs"
-                        >
-                          <span className="text-gray-500">{d.amm}</span>
-                          <span className="text-gray-700 font-medium">
-                            ${(d.liquidity ?? 0).toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </section>
-
-              {/* Top Holders */}
-              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                  Top Holders
-                </h3>
-                {risk?.token_holders_rank && risk.token_holders_rank.length > 0 ? (
-                  <div className="space-y-2 text-sm">
-                    {risk.token_holders_rank.slice(0, 10).map((h, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0"
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-gray-400 w-5 text-right flex-shrink-0">
-                            {i + 1}
-                          </span>
-                          <span className="font-mono text-xs text-gray-500 truncate">
-                            {h.address}
-                          </span>
-                          {h.is_contract === 1 && (
-                            <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                              contract
-                            </span>
-                          )}
-                          {h.is_lp === 1 && (
-                            <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                              LP
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-gray-700 font-medium ml-3 flex-shrink-0">
-                          {h.percent?.toFixed(2)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400">No holder data available</p>
+            {/* ── Overview ── */}
+            {aiAnalysis && (
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <p className="text-sm text-gray-600">{aiAnalysis.overview}</p>
+                {aiAnalysis.recommendation && (
+                  <p className="text-sm font-medium text-blue-700 mt-2">Recommendation: {aiAnalysis.recommendation}</p>
                 )}
+              </div>
+            )}
+
+            {/* ── Controller Info ── */}
+            {aiAnalysis?.controller && (
+              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                  Controller / Owner
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <div className="text-xs text-gray-400">Type</div>
+                    <div className="text-sm font-medium mt-0.5 text-gray-800">{aiAnalysis.controller.type}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Address</div>
+                    <div className="text-sm font-mono mt-0.5 text-gray-800 truncate">
+                      {aiAnalysis.controller.address || "Not detected"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Details</div>
+                    <div className="text-sm mt-0.5 text-gray-600">{aiAnalysis.controller.description}</div>
+                  </div>
+                </div>
               </section>
-            </div>
+            )}
+
+            {/* ── Permission Table ── */}
+            {aiAnalysis?.permissions && (
+              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                  Admin Permission Analysis
+                </h3>
+                <div className="divide-y divide-gray-100">
+                  {Object.entries(aiAnalysis.permissions).map(([key, perm]) => (
+                    <div key={key} className="flex items-start gap-3 py-3">
+                      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0">
+                        <div className={`w-2 h-2 rounded-full ${
+                          perm.present
+                            ? perm.severity === "CRITICAL" ? "bg-red-500" :
+                              perm.severity === "HIGH" ? "bg-orange-500" :
+                              perm.severity === "MEDIUM" ? "bg-yellow-500" :
+                              "bg-blue-500"
+                            : "bg-green-400"
+                        }`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900">
+                            {PERMISSION_LABELS[key] ?? key.replace(/_/g, " ")}
+                          </span>
+                          {perm.present ? (
+                            <SeverityBadge severity={perm.severity} />
+                          ) : (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                              NOT DETECTED
+                            </span>
+                          )}
+                        </div>
+                        {perm.present && perm.description && (
+                          <p className="text-xs text-gray-500 mt-0.5">{perm.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Vulnerabilities ── */}
+            {aiAnalysis?.vulnerabilities && aiAnalysis.vulnerabilities.length > 0 && (
+              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                  Vulnerabilities Found ({aiAnalysis.vulnerabilities.length})
+                </h3>
+                <div className="space-y-3">
+                  {aiAnalysis.vulnerabilities.map((v, i) => (
+                    <div key={i} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-medium text-gray-900">{v.name}</span>
+                        <SeverityBadge severity={v.severity} />
+                      </div>
+                      <p className="text-xs text-gray-600">{v.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Raw AI text fallback ── */}
+            {aiAnalysis?.rawText && (
+              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                  AI Analysis
+                </h3>
+                <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap break-words">
+                  {aiAnalysis.rawText}
+                </div>
+              </section>
+            )}
           </div>
         )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-200 bg-white px-6 py-4 text-center text-xs text-gray-400">
-        Powered by AVE Cloud Data API &middot; PermissionGuard
-      </footer>
-    </div>
-  );
-}
-
-/* ─── Row helper ─── */
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-gray-500">{label}</span>
-      <span className="flex-shrink-0">{value}</span>
+      </div>
     </div>
   );
 }

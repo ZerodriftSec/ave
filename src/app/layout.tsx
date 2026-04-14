@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PermissionGuard - Onchain Admin Risk Monitor",
-  description: "Input any contract address to instantly check its security risk profile powered by AVE",
+  title: "PermissionGuard - Token Risk Scanner",
+  description: "Search any token to instantly check its security risk profile powered by AVE and AI source code analysis",
 };
 
 export default function RootLayout({
@@ -27,7 +27,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="h-full">
+        {children}
+      </body>
     </html>
   );
 }
