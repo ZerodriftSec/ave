@@ -498,6 +498,176 @@ export default function ScannerPage() {
               </div>
             </div>
 
+            {/* ── AVE Risk Details ── */}
+            {/* Temporarily commented out
+            {risk && (
+              <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
+                  AVE Risk Analysis
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {risk.owner && (
+                    <div>
+                      <div className="text-xs text-gray-400">Owner Address</div>
+                      <div className="text-xs font-mono mt-0.5 text-gray-800 truncate" title={risk.owner}>
+                        {risk.owner}
+                      </div>
+                    </div>
+                  )}
+                  {risk.creator_address && (
+                    <div>
+                      <div className="text-xs text-gray-400">Creator Address</div>
+                      <div className="text-xs font-mono mt-0.5 text-gray-800 truncate" title={risk.creator_address}>
+                        {risk.creator_address}
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-xs text-gray-400">Is Honeypot</div>
+                    <div className="text-sm mt-0.5">
+                      {risk.is_honeypot === 1 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
+                          YES
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+                          NO
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Mint Authority</div>
+                    <div className="text-sm mt-0.5">
+                      {risk.has_mint_method === 1 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
+                          YES
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+                          NO
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Blacklist Method</div>
+                    <div className="text-sm mt-0.5">
+                      {risk.has_black_method === 1 ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
+                          YES
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+                          NO
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Can Pause Transfers</div>
+                    <div className="text-sm mt-0.5">
+                      {risk.transfer_pausable === "1" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-orange-100 text-orange-700">
+                          YES
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+                          NO
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Is Proxy Contract</div>
+                    <div className="text-sm mt-0.5">
+                      {risk.is_proxy === "1" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-orange-100 text-orange-700">
+                          YES
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+                          NO
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Self-Destruct</div>
+                    <div className="text-sm mt-0.5">
+                      {risk.selfdestruct === "1" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
+                          YES
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+                          NO
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Owner Can Change Balance</div>
+                    <div className="text-sm mt-0.5">
+                      {risk.owner_change_balance === "1" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
+                          YES
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+                          NO
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400">Hidden Owner</div>
+                    <div className="text-sm mt-0.5">
+                      {risk.hidden_owner === "1" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
+                          DETECTED
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+                          NONE
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {risk.pair_lock_percent != null && (
+                    <div>
+                      <div className="text-xs text-gray-400">Liquidity Lock</div>
+                      <div className="text-sm font-medium mt-0.5 text-gray-800">
+                        {risk.pair_lock_percent > 0 ? `${risk.pair_lock_percent}%` : "Unlocked"}
+                      </div>
+                    </div>
+                  )}
+                  {tokenData?.current_price_usd && (
+                    <div>
+                      <div className="text-xs text-gray-400">Price (USD)</div>
+                      <div className="text-sm font-medium mt-0.5 text-gray-800">
+                        ${Number(tokenData.current_price_usd).toFixed(6)}
+                      </div>
+                    </div>
+                  )}
+                  {tokenData?.fdv && (
+                    <div>
+                      <div className="text-xs text-gray-400">FDV</div>
+                      <div className="text-sm font-medium mt-0.5 text-gray-800">
+                        ${Number(tokenData.fdv).toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs text-gray-500">
+                    Data source: AVE API - Real-time contract risk analysis
+                  </p>
+                </div>
+              </section>
+            )}
+            */}
+
             {/* AI Analysis Error */}
             {aiError && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
