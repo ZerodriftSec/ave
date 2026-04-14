@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       }
     }
   } catch (err) {
-    console.error(`[FetchSource] Cache check error for ${key}:`, err);
+    console.log(`[FetchSource] Cache miss for ${key}`);
     // cache miss, continue
   }
 
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
       await put(key, payload, { access: "private", contentType: "application/json" });
       console.log(`[FetchSource] Source cached to blob: ${key}`);
     } catch (saveErr) {
-      console.error("[FetchSource] Failed to cache source to blob:", saveErr);
+      console.log("[FetchSource] Blob cache unavailable, skipping cache");
     }
 
     return NextResponse.json({ sourceCode: result.sourceCode, cached: false });

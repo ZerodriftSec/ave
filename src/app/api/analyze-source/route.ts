@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (err) {
-      console.error(`[AI] Cache check error:`, err);
+      console.log(`[AI] Cache miss for ${key}`);
       // cache miss, continue
     }
   }
@@ -177,7 +177,7 @@ Be thorough. For each permission field, set "present" to true only if the contra
         await put(key, payload, { access: "private", contentType: "application/json" });
         console.log(`[AI] Analysis cached to blob: ${key}`);
       } catch (saveErr) {
-        console.error("[AI] Failed to cache analysis to blob:", saveErr);
+        console.log("[AI] Blob cache unavailable, skipping cache");
       }
     }
 

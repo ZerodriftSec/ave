@@ -471,7 +471,7 @@ export default function ScannerPage() {
                             <SeverityBadge severity={perm.severity} />
                           ) : (
                             <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                              NOT DETECTED
+                              SAFE
                             </span>
                           )}
                         </div>
