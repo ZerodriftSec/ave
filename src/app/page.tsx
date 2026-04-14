@@ -9,6 +9,9 @@ import {
 } from "@/components/shared";
 
 /* ─── Types ─── */
+type SearchMode = "search" | "address";
+
+/* ─── Types ─── */
 interface SearchResult {
   address: string;
   chain: string;
@@ -91,7 +94,11 @@ const PERMISSION_LABELS: Record<string, string> = {
 
 /* ─── Component ─── */
 export default function ScannerPage() {
+  // Search mode: search by keyword OR direct address + chain
+  const [searchMode, setSearchMode] = useState<SearchMode>("search");
   const [keyword, setKeyword] = useState("");
+  const [addressInput, setAddressInput] = useState("");
+  const [selectedChain, setSelectedChain] = useState("eth"); // Default to Ethereum
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -109,37 +116,64 @@ export default function ScannerPage() {
   const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  // Step 1: Search tokens
+  // Step 1: Search tokens OR Direct address lookup
   const search = useCallback(async () => {
-    const query = keyword.trim();
-    if (!query) return;
+    if (searchMode === "address") {
+      // Direct address lookup - clear states and call selectToken directly
+      const address = addressInput.trim();
+      if (!address) return;
 
-    setSearchLoading(true);
-    setSearchError(null);
-    setSearchResults(null);
-    setSelected(null);
-    setRisk(null);
-    setTokenData(null);
-    setDetailError(null);
-    setAiAnalysis(null);
-    setAiError(null);
+      setSearchError(null);
+      setSearchResults(null);
+      setRisk(null);
+      setTokenData(null);
+      setAiAnalysis(null);
+      setAiError(null);
+      setDetailError(null);
 
-    try {
-      const res = await fetch(
-        `/api/scan?keyword=${encodeURIComponent(query)}`
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Request failed (${res.status})`);
+      // Create a mock SearchResult for the direct address
+      const mockResult: SearchResult = {
+        address: address,
+        chain: selectedChain,
+        name: "Contract",
+        symbol: "",
+        logo_url: "",
+      };
+
+      // Directly proceed to fetch details (selectToken will handle loading state)
+      await selectToken(mockResult);
+    } else {
+      // Keyword search
+      const query = keyword.trim();
+      if (!query) return;
+
+      setSearchLoading(true);
+      setSearchError(null);
+      setSearchResults(null);
+      setSelected(null);
+      setRisk(null);
+      setTokenData(null);
+      setDetailError(null);
+      setAiAnalysis(null);
+      setAiError(null);
+
+      try {
+        const res = await fetch(
+          `/api/scan?keyword=${encodeURIComponent(query)}`
+        );
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `Request failed (${res.status})`);
+        }
+        const results: SearchResult[] = await res.json();
+        setSearchResults(results);
+      } catch (err) {
+        setSearchError(err instanceof Error ? err.message : "Unknown error");
+      } finally {
+        setSearchLoading(false);
       }
-      const results: SearchResult[] = await res.json();
-      setSearchResults(results);
-    } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setSearchLoading(false);
     }
-  }, [keyword]);
+  }, [searchMode, addressInput, selectedChain, keyword]);
 
   // Step 2: User selects a token → fetch AVE + source + AI analysis
   const selectToken = useCallback(async (result: SearchResult) => {
@@ -213,30 +247,93 @@ export default function ScannerPage() {
 
         {/* Search Bar */}
         <div className="mb-8">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && search()}
-              placeholder="Token name, symbol, or contract address (e.g. PEPE, 0x...)"
-              className="flex-1 h-12 rounded-xl border border-gray-300 bg-white px-4 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono placeholder:text-gray-400"
-            />
+          {/* Mode Toggle */}
+          <div className="flex gap-2 mb-3">
             <button
-              onClick={search}
-              disabled={searchLoading || !keyword.trim()}
-              className="h-12 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
+              onClick={() => setSearchMode("search")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                searchMode === "search"
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
             >
-              {searchLoading ? (
-                <span className="inline-flex items-center gap-2">
-                  <Spinner />
-                  Searching
-                </span>
-              ) : (
-                "Search"
-              )}
+              Search by Keyword
+            </button>
+            <button
+              onClick={() => setSearchMode("address")}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                searchMode === "address"
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              Direct Address
             </button>
           </div>
+
+          {/* Search Input Area */}
+          {searchMode === "search" ? (
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && search()}
+                placeholder="Token name, symbol, or contract address (e.g. PEPE, 0x...)"
+                className="flex-1 h-12 rounded-xl border border-gray-300 bg-white px-4 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono placeholder:text-gray-400"
+              />
+              <button
+                onClick={search}
+                disabled={searchLoading || !keyword.trim()}
+                className="h-12 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
+              >
+                {searchLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Spinner />
+                    Searching
+                  </span>
+                ) : (
+                  "Search"
+                )}
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                value={addressInput}
+                onChange={(e) => setAddressInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && search()}
+                placeholder="Contract address (e.g. 0x...)"
+                className="flex-1 h-12 rounded-xl border border-gray-300 bg-white px-4 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono placeholder:text-gray-400"
+              />
+              <select
+                value={selectedChain}
+                onChange={(e) => setSelectedChain(e.target.value)}
+                className="h-12 px-4 rounded-xl border border-gray-300 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer"
+              >
+                {POPULAR_CHAINS.filter(c => c.chain !== "solana").map((chain) => (
+                  <option key={chain.chain} value={chain.chain}>
+                    {chain.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={search}
+                disabled={detailLoading || !addressInput.trim()}
+                className="h-12 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
+              >
+                {detailLoading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Spinner />
+                    Analyzing
+                  </span>
+                ) : (
+                  "Analyze"
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Search Error */}
