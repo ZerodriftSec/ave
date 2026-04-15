@@ -9,12 +9,12 @@ export const POPULAR_CHAINS = [
   { chain: "avalanche", name: "Avalanche" },
 ];
 
-export function riskLevel(score: number): { label: string; color: string; bg: string } {
-  if (score >= 80) return { label: "Dangerous", color: "text-red-600", bg: "bg-red-50 border-red-200" };
-  if (score >= 50) return { label: "High Risk", color: "text-orange-600", bg: "bg-orange-50 border-orange-200" };
-  if (score >= 30) return { label: "Caution", color: "text-amber-600", bg: "bg-amber-50 border-amber-200" };
-  if (score >= 10) return { label: "Low Risk", color: "text-blue-600", bg: "bg-blue-50 border-blue-200" };
-  return { label: "Safe", color: "text-green-600", bg: "bg-green-50 border-green-200" };
+export function riskLevel(score: number): { label: string; color: string; bg: string; glow: string } {
+  if (score >= 80) return { label: "Dangerous", color: "text-[var(--neon-red)]", bg: "border-red-500/30 bg-red-950/30", glow: "neon-glow-red" };
+  if (score >= 50) return { label: "High Risk", color: "text-[var(--neon-orange)]", bg: "border-orange-500/30 bg-orange-950/30", glow: "neon-glow-purple" };
+  if (score >= 30) return { label: "Caution", color: "text-[var(--neon-yellow)]", bg: "border-yellow-500/30 bg-yellow-950/30", glow: "" };
+  if (score >= 10) return { label: "Low Risk", color: "text-[var(--neon-cyan)]", bg: "border-cyan-500/30 bg-cyan-950/30", glow: "" };
+  return { label: "Safe", color: "text-[var(--neon-green)]", bg: "border-green-500/30 bg-green-950/30", glow: "neon-glow-green" };
 }
 
 export function boolTag(value: number | string | boolean | undefined) {
@@ -23,28 +23,28 @@ export function boolTag(value: number | string | boolean | undefined) {
   const isFalse = v === "0" || v === "false" || v === "no" || v === "" || value === undefined || value === null;
   if (isTrue)
     return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
+      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/20">
         YES
       </span>
     );
   if (isFalse)
     return (
-      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-700">
+      <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-500/15 text-green-400 border border-green-500/20">
         NO
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">
+    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gray-500/15 text-gray-400 border border-gray-500/20">
       {String(value)}
     </span>
   );
 }
 
 export function taxColor(tax: number) {
-  if (tax >= 20) return "text-red-600";
-  if (tax >= 5) return "text-orange-600";
-  if (tax >= 1) return "text-amber-600";
-  return "text-green-600";
+  if (tax >= 20) return "text-red-400";
+  if (tax >= 5) return "text-orange-400";
+  if (tax >= 1) return "text-yellow-400";
+  return "text-green-400";
 }
 
 export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
@@ -59,7 +59,7 @@ export function Spinner({ className = "h-4 w-4" }: { className?: string }) {
 export function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4">
-      <span className="text-gray-500">{label}</span>
+      <span className="text-[var(--text-secondary)]">{label}</span>
       <span className="flex-shrink-0">{value}</span>
     </div>
   );
