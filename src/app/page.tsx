@@ -362,9 +362,6 @@ export default function ScannerPage() {
       <div className="bg-orb" style={{ width: 350, height: 350, top: "50%", right: "10%", background: "radial-gradient(circle, rgba(139,92,246,0.1), transparent 70%)", animationDelay: "-7s" }} />
       <div className="bg-orb" style={{ width: 300, height: 300, bottom: "10%", left: "30%", background: "radial-gradient(circle, rgba(0,255,136,0.06), transparent 70%)", animationDelay: "-13s" }} />
 
-      {/* Scan line */}
-      <div className="scan-line" />
-
       {/* ─── Main Content ─── */}
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* ─── Header ─── */}
